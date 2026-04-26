@@ -1,5 +1,5 @@
 import os
-from typing import Protocol
+from typing import Optional, Protocol
 
 from .models import Reservation
 
@@ -9,6 +9,12 @@ class ReservationStore(Protocol):
         ...
 
     def create(self, reservation: Reservation) -> Reservation:
+        ...
+
+    def update(self, reservation_id: str, reservation: Reservation) -> Optional[Reservation]:
+        ...
+
+    def delete(self, reservation_id: str) -> bool:
         ...
 
 
@@ -82,3 +88,45 @@ class PostgresReservationStore:
                 row = cursor.fetchone()
             connection.commit()
         return Reservation.model_validate(self._normalize_row(row))
+
+    def update(self, reservation_id: str, reservation: Reservation) -> Optional[Reservation]:
+        query = """
+            update public.reservations
+            set owner_name = %s,
+                dog_name = %s,
+                price = %s,
+                is_rover = %s,
+                start_date = %s,
+                end_date = %s
+            where id = %s
+            returning id, owner_name, dog_name, price, is_rover, start_date, end_date
+        """
+        payload = (
+            reservation.owner_name,
+            reservation.dog_name,
+            reservation.price,
+            reservation.is_rover,
+            reservation.start_date,
+            reservation.end_date,
+            reservation_id,
+        )
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(query, payload)
+                row = cursor.fetchone()
+            connection.commit()
+        if row is None:
+            return None
+        return Reservation.model_validate(self._normalize_row(row))
+
+    def delete(self, reservation_id: str) -> bool:
+        query = """
+            delete from public.reservations
+            where id = %s
+        """
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(query, (reservation_id,))
+                deleted = cursor.rowcount > 0
+            connection.commit()
+        return deleted

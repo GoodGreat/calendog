@@ -1,7 +1,7 @@
 import os
 from typing import Optional
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Response, status
 from fastapi.middleware.cors import CORSMiddleware
 
 from .models import Reservation, ReservationCreate
@@ -32,6 +32,21 @@ def create_app(store: Optional[ReservationStore] = None) -> FastAPI:
     def create_reservation(payload: ReservationCreate) -> Reservation:
         reservation = Reservation(**payload.model_dump())
         return app.state.store.create(reservation)
+
+    @app.put("/reservations/{reservation_id}", response_model=Reservation)
+    def update_reservation(reservation_id: str, payload: ReservationCreate) -> Reservation:
+        reservation = Reservation(id=reservation_id, **payload.model_dump())
+        updated = app.state.store.update(reservation_id, reservation)
+        if updated is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reservation not found")
+        return updated
+
+    @app.delete("/reservations/{reservation_id}", status_code=204)
+    def delete_reservation(reservation_id: str) -> Response:
+        deleted = app.state.store.delete(reservation_id)
+        if not deleted:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reservation not found")
+        return Response(status_code=status.HTTP_204_NO_CONTENT)
 
     return app
 
