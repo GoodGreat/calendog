@@ -21,7 +21,11 @@ export type ReservationSegment = {
   reservation: Reservation;
   startColumn: number;
   span: number;
+  lane: number;
+  colorIndex: number;
 };
+
+const BAR_COLOR_COUNT = 4;
 
 export const getMonthDays = (month: Date): CalendarDay[] => {
   const monthStart = startOfMonth(month);
@@ -47,8 +51,7 @@ export const getWeekSegments = (
 ): ReservationSegment[] => {
   const weekStart = week[0];
   const weekEnd = week[6];
-
-  return reservations
+  const baseSegments = reservations
     .map((reservation) => {
       const reservationStart = parseISO(reservation.start_date);
       const reservationEnd = parseISO(reservation.end_date);
@@ -71,7 +74,57 @@ export const getWeekSegments = (
         span,
       };
     })
-    .filter((segment): segment is ReservationSegment => Boolean(segment));
+    .filter((segment): segment is { reservation: Reservation; startColumn: number; span: number } =>
+      Boolean(segment),
+    )
+    .sort((left, right) => {
+      if (left.startColumn !== right.startColumn) {
+        return left.startColumn - right.startColumn;
+      }
+      if (left.span !== right.span) {
+        return right.span - left.span;
+      }
+      return left.reservation.id.localeCompare(right.reservation.id);
+    });
+
+  const laneEndColumns: number[] = [];
+  const laneColors: number[] = [];
+
+  return baseSegments.map((segment) => {
+    const segmentEndColumn = segment.startColumn + segment.span - 1;
+    let lane = laneEndColumns.findIndex((endColumn) => endColumn < segment.startColumn);
+
+    if (lane === -1) {
+      lane = laneEndColumns.length;
+      laneEndColumns.push(segmentEndColumn);
+      laneColors.push(-1);
+    } else {
+      laneEndColumns[lane] = segmentEndColumn;
+    }
+
+    const usedColors = new Set<number>();
+    laneEndColumns.forEach((endColumn, laneIndex) => {
+      if (laneIndex === lane) {
+        return;
+      }
+      const overlaps = endColumn >= segment.startColumn;
+      if (overlaps) {
+        usedColors.add(laneColors[laneIndex]);
+      }
+    });
+
+    let colorIndex = 0;
+    while (usedColors.has(colorIndex)) {
+      colorIndex = (colorIndex + 1) % BAR_COLOR_COUNT;
+    }
+    laneColors[lane] = colorIndex;
+
+    return {
+      ...segment,
+      lane,
+      colorIndex,
+    };
+  });
 };
 
 export const getWeekChunks = (days: CalendarDay[]): Date[][] => {

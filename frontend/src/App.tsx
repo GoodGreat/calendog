@@ -12,14 +12,38 @@ const API_URL = (import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000").replac
 export default function App() {
   const [month, setMonth] = useState(new Date());
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [activeReservation, setActiveReservation] = useState<Reservation | null>(null);
   const [showForm, setShowForm] = useState(false);
+
+  const sortReservations = (items: Reservation[]) =>
+    [...items].sort((left, right) => {
+      if (left.start_date !== right.start_date) {
+        return left.start_date.localeCompare(right.start_date);
+      }
+      return left.end_date.localeCompare(right.end_date);
+    });
 
   useEffect(() => {
     fetch(`${API_URL}/reservations`)
       .then((response) => response.json())
-      .then((data: Reservation[]) => setReservations(data))
+      .then((data: Reservation[]) => setReservations(sortReservations(data)))
       .catch(() => setReservations([]));
   }, []);
+
+  const openCreateForm = () => {
+    setActiveReservation(null);
+    setShowForm(true);
+  };
+
+  const openEditForm = (reservation: Reservation) => {
+    setActiveReservation(reservation);
+    setShowForm(true);
+  };
+
+  const closeForm = () => {
+    setShowForm(false);
+    setActiveReservation(null);
+  };
 
   const handleCreate = async (input: ReservationInput) => {
     const response = await fetch(`${API_URL}/reservations`, {
@@ -31,9 +55,38 @@ export default function App() {
       throw new Error("Failed to create reservation");
     }
     const created = (await response.json()) as Reservation;
+    setReservations((current) => sortReservations([...current, created]));
+  };
+
+  const handleUpdate = async (input: ReservationInput) => {
+    if (!activeReservation) {
+      return;
+    }
+    const response = await fetch(`${API_URL}/reservations/${activeReservation.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to update reservation");
+    }
+    const updated = (await response.json()) as Reservation;
     setReservations((current) =>
-      [...current, created].sort((a, b) => a.start_date.localeCompare(b.start_date)),
+      sortReservations(current.map((item) => (item.id === updated.id ? updated : item))),
     );
+  };
+
+  const handleDelete = async () => {
+    if (!activeReservation) {
+      return;
+    }
+    const response = await fetch(`${API_URL}/reservations/${activeReservation.id}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      throw new Error("Failed to delete reservation");
+    }
+    setReservations((current) => current.filter((item) => item.id !== activeReservation.id));
   };
 
   return (
@@ -56,7 +109,7 @@ export default function App() {
           </div>
 
           <button
-            onClick={() => setShowForm(true)}
+            onClick={openCreateForm}
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-orange-500 px-5 py-3 font-medium text-white"
           >
             <Plus size={18} />
@@ -85,11 +138,20 @@ export default function App() {
           </div>
         </section>
 
-        <Calendar month={month} reservations={reservations} />
+        <Calendar
+          month={month}
+          reservations={reservations}
+          onSelectReservation={openEditForm}
+        />
       </div>
 
       {showForm ? (
-        <ReservationForm onClose={() => setShowForm(false)} onSave={handleCreate} />
+        <ReservationForm
+          initialValue={activeReservation}
+          onClose={closeForm}
+          onDelete={activeReservation ? handleDelete : undefined}
+          onSave={activeReservation ? handleUpdate : handleCreate}
+        />
       ) : null}
     </main>
   );

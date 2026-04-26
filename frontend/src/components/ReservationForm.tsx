@@ -1,10 +1,12 @@
 import { type FormEvent, useState } from "react";
 
-import type { ReservationInput } from "../types/reservation";
+import type { Reservation, ReservationInput } from "../types/reservation";
 
 type Props = {
   onClose: () => void;
   onSave: (input: ReservationInput) => Promise<void>;
+  onDelete?: () => Promise<void>;
+  initialValue?: Reservation | null;
 };
 
 const initialState: ReservationInput = {
@@ -16,9 +18,23 @@ const initialState: ReservationInput = {
   end_date: "",
 };
 
-export function ReservationForm({ onClose, onSave }: Props) {
-  const [form, setForm] = useState(initialState);
+export function ReservationForm({ onClose, onSave, onDelete, initialValue = null }: Props) {
+  const [form, setForm] = useState<ReservationInput>(
+    initialValue
+      ? {
+          owner_name: initialValue.owner_name,
+          dog_name: initialValue.dog_name,
+          price: initialValue.price,
+          is_rover: initialValue.is_rover,
+          start_date: initialValue.start_date,
+          end_date: initialValue.end_date,
+        }
+      : initialState,
+  );
   const [error, setError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const isEditing = Boolean(initialValue);
 
   const update = <K extends keyof ReservationInput>(key: K, value: ReservationInput[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -28,10 +44,28 @@ export function ReservationForm({ onClose, onSave }: Props) {
     setError("");
     try {
       await onSave(form);
-      setForm(initialState);
+      if (!isEditing) {
+        setForm(initialState);
+      }
       onClose();
     } catch {
       setError("Could not save the reservation. Check the backend connection and try again.");
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!onDelete) {
+      return;
+    }
+    setError("");
+    setIsDeleting(true);
+    try {
+      await onDelete();
+      onClose();
+    } catch {
+      setError("Could not delete the reservation. Check the backend connection and try again.");
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -42,7 +76,9 @@ export function ReservationForm({ onClose, onSave }: Props) {
         className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
       >
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-bark">New reservation</h2>
+          <h2 className="text-xl font-semibold text-bark">
+            {isEditing ? "Edit reservation" : "New reservation"}
+          </h2>
           <button type="button" onClick={onClose} className="text-sm text-bark/70">
             Close
           </button>
@@ -101,12 +137,24 @@ export function ReservationForm({ onClose, onSave }: Props) {
 
         {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
 
-        <button
-          type="submit"
-          className="mt-5 w-full rounded-2xl bg-orange-500 px-4 py-3 font-medium text-white"
-        >
-          Save reservation
-        </button>
+        <div className="mt-5 flex gap-3">
+          {isEditing ? (
+            <button
+              type="button"
+              onClick={handleDelete}
+              disabled={isDeleting}
+              className="rounded-2xl border border-red-200 px-4 py-3 font-medium text-red-600 disabled:opacity-60"
+            >
+              Delete
+            </button>
+          ) : null}
+          <button
+            type="submit"
+            className="flex-1 rounded-2xl bg-orange-500 px-4 py-3 font-medium text-white"
+          >
+            {isEditing ? "Update reservation" : "Save reservation"}
+          </button>
+        </div>
       </form>
     </div>
   );

@@ -1,4 +1,4 @@
-import { format, isSameDay, isToday, parseISO } from "date-fns";
+import { format, isToday } from "date-fns";
 
 import {
   getMonthDays,
@@ -12,9 +12,17 @@ const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 type Props = {
   month: Date;
   reservations: Reservation[];
+  onSelectReservation: (reservation: Reservation) => void;
 };
 
-export function Calendar({ month, reservations }: Props) {
+const barColors = [
+  "bg-orange-500",
+  "bg-blue-500",
+  "bg-emerald-500",
+  "bg-rose-500",
+];
+
+export function Calendar({ month, reservations, onSelectReservation }: Props) {
   const days = getMonthDays(month);
   const weeks = getWeekChunks(days);
 
@@ -29,6 +37,8 @@ export function Calendar({ month, reservations }: Props) {
       <div className="space-y-2">
         {weeks.map((week, index) => {
           const segments = getWeekSegments(week, reservations);
+          const laneCount = Math.max(segments.reduce((maxLane, segment) => Math.max(maxLane, segment.lane), -1) + 1, 1);
+          const barAreaHeight = laneCount * 32;
 
           return (
             <div key={index} className="relative">
@@ -36,11 +46,12 @@ export function Calendar({ month, reservations }: Props) {
                 {week.map((day) => (
                   <div
                     key={day.toISOString()}
-                    className="min-h-28 rounded-3xl border border-orange-100 bg-cream p-2"
+                    className="rounded-3xl border border-orange-100 bg-cream p-2"
+                    style={{ minHeight: `${barAreaHeight + 56}px` }}
                   >
                     <div
                       className={[
-                        "mb-10 flex h-8 w-8 items-center justify-center rounded-full text-sm",
+                        "flex h-8 w-8 items-center justify-center rounded-full text-sm",
                         isToday(day) ? "bg-orange-500 text-white" : "text-bark",
                       ].join(" ")}
                     >
@@ -48,40 +59,28 @@ export function Calendar({ month, reservations }: Props) {
                         {format(day, "d")}
                       </span>
                     </div>
-
-                    <div className="space-y-1 text-xs text-bark/70">
-                      {reservations
-                        .filter(
-                          (reservation) =>
-                            isSameDay(parseISO(reservation.start_date), day) ||
-                            isSameDay(parseISO(reservation.end_date), day),
-                        )
-                        .slice(0, 2)
-                        .map((reservation) => (
-                          <div key={reservation.id} className="truncate">
-                            {reservation.dog_name}
-                          </div>
-                        ))}
-                    </div>
                   </div>
                 ))}
               </div>
 
-              <div className="pointer-events-none absolute inset-x-0 top-11 space-y-1 px-1">
+              <div className="absolute inset-x-0 top-11 px-1">
                 {segments.map((segment) => (
-                  <div
+                  <button
+                    type="button"
                     key={`${segment.reservation.id}-${segment.startColumn}`}
                     className={[
-                      "flex h-7 items-center overflow-hidden rounded-full px-3 text-xs font-medium text-white shadow-sm",
-                      segment.reservation.is_rover ? "bg-orange-500" : "bg-blue-500",
+                      "absolute flex h-7 items-center overflow-hidden rounded-full px-3 text-xs font-medium text-white shadow-sm transition-transform hover:scale-[1.01]",
+                      barColors[segment.colorIndex],
                     ].join(" ")}
                     style={{
+                      top: `${segment.lane * 32}px`,
                       marginLeft: `calc((100% / 7) * ${segment.startColumn - 1} + 4px)`,
                       width: `calc((100% / 7) * ${segment.span} - 8px)`,
                     }}
+                    onClick={() => onSelectReservation(segment.reservation)}
                   >
-                    {segment.reservation.dog_name} · {segment.reservation.owner_name}
-                  </div>
+                    {segment.reservation.owner_name} - {segment.reservation.dog_name}
+                  </button>
                 ))}
               </div>
             </div>
