@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getReservationDates, getWeekSegments } from "./calendar";
+import { getMonthDays, getReservationDates, getWeekSegments } from "./calendar";
 import { getDisplayedReservationPrice } from "../components/Calendar";
 
 describe("getReservationDates", () => {
@@ -21,6 +21,13 @@ describe("getReservationDates", () => {
       "2026-04-12",
       "2026-04-13",
     ]);
+  });
+});
+
+describe("getMonthDays", () => {
+  it("starts the visible calendar grid on monday", () => {
+    const days = getMonthDays(new Date("2026-04-01"));
+    expect(days[0].date.getDay()).toBe(1);
   });
 });
 

@@ -30,8 +30,8 @@ const BAR_COLOR_COUNT = 4;
 export const getMonthDays = (month: Date): CalendarDay[] => {
   const monthStart = startOfMonth(month);
   const monthEnd = endOfMonth(month);
-  const gridStart = startOfWeek(monthStart, { weekStartsOn: 0 });
-  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 0 });
+  const gridStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const gridEnd = endOfWeek(monthEnd, { weekStartsOn: 1 });
 
   return eachDayOfInterval({ start: gridStart, end: gridEnd }).map((date) => ({
     date,
