@@ -39,6 +39,9 @@ The FastAPI backend provides:
 
 - `GET /reservations`
 - `POST /reservations`
+- `PUT /reservations/{id}`
+- `DELETE /reservations/{id}`
+- `GET /cron/reminders`
 
 Reservations are persisted in Supabase Postgres through the `DATABASE_URL` environment
 variable.
@@ -70,6 +73,14 @@ cp frontend/.env.example frontend/.env
 
 Set `backend/.env` to your Supabase transaction pooler connection string, and set
 `frontend/.env` to the backend URL you want the web app to call.
+
+For reminder emails, also set these backend variables:
+
+- `RESEND_API_KEY`
+- `REMINDER_FROM_EMAIL`
+- `REMINDER_RECIPIENTS`
+- `REMINDER_TIMEZONE`
+- `CRON_SECRET`
 
 Run the backend from the repository root:
 
@@ -121,3 +132,27 @@ create table public.reservations (
 
 create index reservations_start_date_idx on public.reservations (start_date);
 ```
+
+## Reminder emails
+
+The backend includes a reminder endpoint at `GET /cron/reminders`. It looks for reservations
+starting on the next day in `REMINDER_TIMEZONE` and sends a summary email through Resend to the
+comma-separated recipients in `REMINDER_RECIPIENTS`.
+
+For the backend Vercel project, `backend/vercel.json` configures a daily cron job:
+
+```json
+{
+  "crons": [
+    {
+      "path": "/cron/reminders",
+      "schedule": "0 7 * * *"
+    }
+  ]
+}
+```
+
+Important: Vercel cron expressions run in UTC, and on the Hobby plan daily jobs only have hourly
+precision. The current `0 7 * * *` schedule is the best free approximation for a 09:00 send while
+Europe/Madrid is on daylight saving time. If you need an exact 09:00 Europe/Madrid reminder
+year-round, Vercel Hobby is not precise enough; this daily job is the free approximation path.
