@@ -5,6 +5,7 @@ CalenDog is a minimalist dog sitting reservation calendar. It gives a single-pag
 ## Stack
 
 - Backend: Python, FastAPI
+- Database: Supabase Postgres
 - Frontend: React, TypeScript, Vite
 - Styling: Tailwind CSS
 - Date utilities: date-fns
@@ -28,7 +29,6 @@ calendog/
   backend/
     app/
     tests/
-    reservations.json
   frontend/
     src/
 ```
@@ -40,7 +40,8 @@ The FastAPI backend provides:
 - `GET /reservations`
 - `POST /reservations`
 
-Reservations are persisted in `backend/reservations.json`.
+Reservations are persisted in Supabase Postgres through the `DATABASE_URL` environment
+variable.
 
 ## Frontend
 
@@ -60,9 +61,22 @@ Create a backend virtual environment from the system Python and install dependen
 .venv/bin/pip install -r backend/requirements.txt
 ```
 
+Copy the example environment files:
+
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+```
+
+Set `backend/.env` to your Supabase transaction pooler connection string, and set
+`frontend/.env` to the backend URL you want the web app to call.
+
 Run the backend from the repository root:
 
 ```bash
+set -a
+source backend/.env
+set +a
 .venv/bin/uvicorn backend.app.main:app --reload --app-dir .
 ```
 
@@ -84,4 +98,26 @@ Frontend:
 
 ```bash
 npm test
+```
+
+## Supabase schema
+
+Run this SQL in your Supabase SQL editor before starting the backend:
+
+```sql
+create extension if not exists pgcrypto;
+
+create table public.reservations (
+  id uuid primary key default gen_random_uuid(),
+  owner_name text not null,
+  dog_name text not null,
+  price numeric(10,2) not null,
+  is_rover boolean not null default false,
+  start_date date not null,
+  end_date date not null,
+  created_at timestamptz not null default now(),
+  constraint valid_date_range check (end_date >= start_date)
+);
+
+create index reservations_start_date_idx on public.reservations (start_date);
 ```
