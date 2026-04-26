@@ -1,25 +1,28 @@
-from pathlib import Path
+import os
 from typing import Optional
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .models import Reservation, ReservationCreate
-from .storage import ReservationStore
+from .storage import PostgresReservationStore, ReservationStore
 
 
-def create_app(data_file: Optional[Path] = None) -> FastAPI:
+def get_allowed_origins() -> list[str]:
+    raw = os.environ.get("CORS_ORIGINS", "http://127.0.0.1:5173,http://localhost:5173")
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def create_app(store: Optional[ReservationStore] = None) -> FastAPI:
     app = FastAPI(title="CalenDog API")
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=get_allowed_origins(),
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    app.state.store = ReservationStore(
-        data_file or Path(__file__).resolve().parent.parent / "reservations.json"
-    )
+    app.state.store = store or PostgresReservationStore.from_env()
 
     @app.get("/reservations", response_model=list[Reservation])
     def get_reservations() -> list[Reservation]:

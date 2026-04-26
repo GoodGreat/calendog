@@ -1,23 +1,84 @@
-import json
-from pathlib import Path
+import os
+from typing import Protocol
 
 from .models import Reservation
 
 
-class ReservationStore:
-    def __init__(self, file_path: Path) -> None:
-        self.file_path = file_path
-        self.file_path.parent.mkdir(parents=True, exist_ok=True)
-        if not self.file_path.exists():
-            self.file_path.write_text("[]", encoding="utf-8")
-
+class ReservationStore(Protocol):
     def list(self) -> list[Reservation]:
-        raw = json.loads(self.file_path.read_text(encoding="utf-8"))
-        return [Reservation.model_validate(item) for item in raw]
+        ...
 
     def create(self, reservation: Reservation) -> Reservation:
-        reservations = self.list()
-        reservations.append(reservation)
-        payload = [item.model_dump(mode="json") for item in reservations]
-        self.file_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
-        return reservation
+        ...
+
+
+class PostgresReservationStore:
+    def __init__(self, database_url: str) -> None:
+        self.database_url = database_url
+
+    @classmethod
+    def from_env(cls) -> "PostgresReservationStore":
+        database_url = os.environ.get("DATABASE_URL")
+        if not database_url:
+            raise RuntimeError(
+                "DATABASE_URL is not configured. Set it to your Supabase transaction pooler URL."
+            )
+        return cls(database_url)
+
+    def _connect(self):
+        try:
+            import psycopg
+            from psycopg.rows import dict_row
+        except ImportError as exc:
+            raise RuntimeError(
+                "psycopg is required for database access. Install backend dependencies first."
+            ) from exc
+
+        return psycopg.connect(self.database_url, row_factory=dict_row)
+
+    def _normalize_row(self, row: dict) -> dict:
+        normalized = dict(row)
+        normalized["id"] = str(normalized["id"])
+        return normalized
+
+    def list(self) -> list[Reservation]:
+        query = """
+            select id, owner_name, dog_name, price, is_rover, start_date, end_date
+            from public.reservations
+            order by start_date, end_date, created_at, id
+        """
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(query)
+                rows = cursor.fetchall()
+        return [Reservation.model_validate(self._normalize_row(row)) for row in rows]
+
+    def create(self, reservation: Reservation) -> Reservation:
+        query = """
+            insert into public.reservations (
+                id,
+                owner_name,
+                dog_name,
+                price,
+                is_rover,
+                start_date,
+                end_date
+            )
+            values (%s, %s, %s, %s, %s, %s, %s)
+            returning id, owner_name, dog_name, price, is_rover, start_date, end_date
+        """
+        payload = (
+            reservation.id,
+            reservation.owner_name,
+            reservation.dog_name,
+            reservation.price,
+            reservation.is_rover,
+            reservation.start_date,
+            reservation.end_date,
+        )
+        with self._connect() as connection:
+            with connection.cursor() as cursor:
+                cursor.execute(query, payload)
+                row = cursor.fetchone()
+            connection.commit()
+        return Reservation.model_validate(self._normalize_row(row))

@@ -1,13 +1,28 @@
-import json
+import os
 
 from fastapi.testclient import TestClient
 
+os.environ.setdefault("DATABASE_URL", "postgresql://example")
+
 from backend.app.main import create_app
+from backend.app.models import Reservation
 
 
-def test_create_reservation_persists_to_file(tmp_path):
-    data_file = tmp_path / "reservations.json"
-    client = TestClient(create_app(data_file))
+class InMemoryReservationStore:
+    def __init__(self) -> None:
+        self.reservations: list[Reservation] = []
+
+    def list(self) -> list[Reservation]:
+        return list(self.reservations)
+
+    def create(self, reservation: Reservation) -> Reservation:
+        self.reservations.append(reservation)
+        return reservation
+
+
+def test_create_reservation_persists_to_store():
+    store = InMemoryReservationStore()
+    client = TestClient(create_app(store=store))
 
     response = client.post(
         "/reservations",
@@ -25,6 +40,4 @@ def test_create_reservation_persists_to_file(tmp_path):
     body = response.json()
     assert body["dog_name"] == "Milo"
     assert body["id"]
-
-    persisted = json.loads(data_file.read_text(encoding="utf-8"))
-    assert persisted[0]["owner_name"] == "Alex"
+    assert store.reservations[0].owner_name == "Alex"
