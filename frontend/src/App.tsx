@@ -7,7 +7,7 @@ import { ReservationForm } from "./components/ReservationForm";
 import { nextMonth, previousMonth } from "./lib/calendar";
 import type { Reservation, ReservationInput } from "./types/reservation";
 
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = (import.meta.env.VITE_API_URL ?? "http://127.0.0.1:8000").replace(/\/$/, "");
 
 export default function App() {
   const [month, setMonth] = useState(new Date());
@@ -27,6 +27,9 @@ export default function App() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(input),
     });
+    if (!response.ok) {
+      throw new Error("Failed to create reservation");
+    }
     const created = (await response.json()) as Reservation;
     setReservations((current) =>
       [...current, created].sort((a, b) => a.start_date.localeCompare(b.start_date)),

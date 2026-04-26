@@ -18,15 +18,21 @@ const initialState: ReservationInput = {
 
 export function ReservationForm({ onClose, onSave }: Props) {
   const [form, setForm] = useState(initialState);
+  const [error, setError] = useState("");
 
   const update = <K extends keyof ReservationInput>(key: K, value: ReservationInput[K]) =>
     setForm((current) => ({ ...current, [key]: value }));
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    await onSave(form);
-    setForm(initialState);
-    onClose();
+    setError("");
+    try {
+      await onSave(form);
+      setForm(initialState);
+      onClose();
+    } catch {
+      setError("Could not save the reservation. Check the backend connection and try again.");
+    }
   };
 
   return (
@@ -92,6 +98,8 @@ export function ReservationForm({ onClose, onSave }: Props) {
             Booked via Rover
           </label>
         </div>
+
+        {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
 
         <button
           type="submit"
