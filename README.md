@@ -1,119 +1,69 @@
 # CalenDog
 
-CalenDog is a minimalist dog sitting reservation calendar. It gives a single-page monthly view where reservations can be added and reviewed as continuous multi-day bars, with separate styling for Rover and private bookings.
+CalenDog is a dog sitting reservation calendar with a FastAPI backend, a React frontend, and Supabase Postgres for shared storage.
 
-## Stack
+## What it does
 
-- Backend: Python, FastAPI
-- Database: Supabase Postgres
+- Shows reservations in a monthly calendar
+- Supports creating, editing, and deleting reservations
+- Displays multi-day stays as colored bars
+- Sends reminder emails for reservations starting the next day
+
+## Tech stack
+
+- Backend: FastAPI
 - Frontend: React, TypeScript, Vite
+- Database: Supabase Postgres
 - Styling: Tailwind CSS
-- Date utilities: date-fns
-- Icons: lucide-react
-- Backend testing: pytest
-- Frontend testing: Vitest
+- Email reminders: Resend
 
-## Purpose
+## Local development
 
-The app is meant to be a lightweight scheduling tool for dog sitting. Instead of a complex booking system, it focuses on a fast monthly overview:
-
-- View reservations in a custom month calendar
-- Add new reservations with owner, dog, price, source, and date range
-- Show multi-day stays as horizontal bars across the calendar grid
-- Distinguish Rover bookings from private bookings by color
-
-## Project Structure
-
-```text
-calendog/
-  backend/
-    app/
-    tests/
-  frontend/
-    src/
-```
-
-## Backend
-
-The FastAPI backend provides:
-
-- `GET /reservations`
-- `POST /reservations`
-- `PUT /reservations/{id}`
-- `DELETE /reservations/{id}`
-- `GET /cron/reminders`
-
-Reservations are persisted in Supabase Postgres through the `DATABASE_URL` environment
-variable.
-
-## Frontend
-
-The frontend is a Vite React app with:
-
-- A custom month-view calendar built with CSS Grid
-- Previous and next month navigation
-- A reservation form modal
-- Tailwind-based playful, clean styling
-
-## Local Development
-
-Create a backend virtual environment from the system Python and install dependencies:
+Backend:
 
 ```bash
 /usr/bin/python3 -m venv .venv
-.venv/bin/pip install -r backend/requirements.txt
-```
-
-Copy the example environment files:
-
-```bash
+.venv/bin/python -m pip install -r backend/requirements.txt
 cp backend/.env.example backend/.env
-cp frontend/.env.example frontend/.env
-```
-
-Set `backend/.env` to your Supabase transaction pooler connection string, and set
-`frontend/.env` to the backend URL you want the web app to call.
-
-For reminder emails, also set these backend variables:
-
-- `RESEND_API_KEY`
-- `REMINDER_FROM_EMAIL`
-- `REMINDER_RECIPIENTS`
-- `REMINDER_TIMEZONE`
-- `CRON_SECRET`
-
-Run the backend from the repository root:
-
-```bash
 set -a
 source backend/.env
 set +a
 .venv/bin/uvicorn backend.app.main:app --reload --app-dir .
 ```
 
-Run the frontend from `frontend/`:
-
-```bash
-npm run dev
-```
-
-## Tests
-
-Backend:
-
-```bash
-.venv/bin/python -m pytest backend/tests -q
-```
-
 Frontend:
 
 ```bash
-npm test
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
 ```
 
-## Supabase schema
+## Environment variables
 
-Run this SQL in your Supabase SQL editor before starting the backend:
+Backend:
+
+- `DATABASE_URL`
+- `CORS_ORIGINS`
+- `RESEND_API_KEY`
+- `REMINDER_FROM_EMAIL`
+- `REMINDER_RECIPIENTS`
+- `REMINDER_TIMEZONE`
+- `CRON_SECRET`
+
+Frontend:
+
+- `VITE_API_URL`
+
+Example templates are included in:
+
+- [backend/.env.example](/Users/almartinez/Desktop/calendog/backend/.env.example:1)
+- [frontend/.env.example](/Users/almartinez/Desktop/calendog/frontend/.env.example:1)
+
+## Database
+
+Create the `reservations` table in Supabase before running the backend:
 
 ```sql
 create extension if not exists pgcrypto;
@@ -133,26 +83,26 @@ create table public.reservations (
 create index reservations_start_date_idx on public.reservations (start_date);
 ```
 
-## Reminder emails
+## Deployment
 
-The backend includes a reminder endpoint at `GET /cron/reminders`. It looks for reservations
-starting on the next day in `REMINDER_TIMEZONE` and sends a summary email through Resend to the
-comma-separated recipients in `REMINDER_RECIPIENTS`.
+This repo is designed to be deployed as two Vercel projects from the same repository:
 
-For the backend Vercel project, `backend/vercel.json` configures a daily cron job:
+- `backend/`
+- `frontend/`
 
-```json
-{
-  "crons": [
-    {
-      "path": "/cron/reminders",
-      "schedule": "0 7 * * *"
-    }
-  ]
-}
+The backend also includes a daily Vercel cron job in [backend/vercel.json](/Users/almartinez/Desktop/calendog/backend/vercel.json:1) for reminder emails.
+
+## Tests
+
+Backend:
+
+```bash
+.venv/bin/python -m pytest
 ```
 
-Important: Vercel cron expressions run in UTC, and on the Hobby plan daily jobs only have hourly
-precision. The current `0 7 * * *` schedule is the best free approximation for a 09:00 send while
-Europe/Madrid is on daylight saving time. If you need an exact 09:00 Europe/Madrid reminder
-year-round, Vercel Hobby is not precise enough; this daily job is the free approximation path.
+Frontend:
+
+```bash
+cd frontend
+npm test
+```
