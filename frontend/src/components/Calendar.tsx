@@ -22,6 +22,12 @@ const barColors = [
   "bg-rose-500",
 ];
 
+export const getDisplayedReservationPrice = (reservation: Reservation): string => {
+  const effectivePrice = reservation.is_rover ? reservation.price * 0.85 : reservation.price;
+  const roundedPrice = Math.round(effectivePrice * 100) / 100;
+  return Number.isInteger(roundedPrice) ? `${roundedPrice}` : roundedPrice.toFixed(2);
+};
+
 export function Calendar({ month, reservations, onSelectReservation }: Props) {
   const days = getMonthDays(month);
   const weeks = getWeekChunks(days);
@@ -79,7 +85,8 @@ export function Calendar({ month, reservations, onSelectReservation }: Props) {
                     }}
                     onClick={() => onSelectReservation(segment.reservation)}
                   >
-                    {segment.reservation.owner_name} - {segment.reservation.dog_name}
+                    {segment.reservation.owner_name} - {segment.reservation.dog_name} (
+                    {getDisplayedReservationPrice(segment.reservation)}€)
                   </button>
                 ))}
               </div>

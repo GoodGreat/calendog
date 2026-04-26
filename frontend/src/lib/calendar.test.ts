@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { getReservationDates, getWeekSegments } from "./calendar";
+import { getDisplayedReservationPrice } from "../components/Calendar";
 
 describe("getReservationDates", () => {
   it("returns every day in the reservation range", () => {
@@ -70,5 +71,35 @@ describe("getWeekSegments", () => {
     expect(segments[1].lane).toBe(1);
     expect(segments[0].colorIndex).not.toBe(segments[1].colorIndex);
     expect(segments[2].lane).toBe(0);
+  });
+});
+
+describe("getDisplayedReservationPrice", () => {
+  it("returns the full price for private reservations", () => {
+    expect(
+      getDisplayedReservationPrice({
+        id: "1",
+        owner_name: "Irene",
+        dog_name: "Milu",
+        price: 40,
+        is_rover: false,
+        start_date: "2026-04-26",
+        end_date: "2026-04-27",
+      }),
+    ).toBe("40");
+  });
+
+  it("returns 85 percent of the price for rover reservations", () => {
+    expect(
+      getDisplayedReservationPrice({
+        id: "2",
+        owner_name: "Paloma",
+        dog_name: "Robin",
+        price: 48,
+        is_rover: true,
+        start_date: "2026-04-26",
+        end_date: "2026-04-28",
+      }),
+    ).toBe("40.80");
   });
 });
